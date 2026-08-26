@@ -1,5 +1,33 @@
-import requests, urllib.parse, numpy as np
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import requests, uuid, urllib.parse, math
+import streamlit.components.v1 as components
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
+st.set_page_config(page_title="FormuAI-QbD Suite", layout="wide", initial_sidebar_state="expanded")
+
+# --- INITIALIZE STATE ---
+if "active_drug" not in st.session_state:
+    st.session_state.active_drug = {
+        "name": "Artemisinin", "cid": 68827, "formula": "C15H22O5",
+        "smiles": "CC1CCC2C(C(=O)CC3C2(O1)OO3)C", "mw": 282.33, "logp": 2.9,
+        "h_donors": 0, "h_acceptors": 5, "bcs": "Class II (Low Solubility, High Permeability)", 
+        "dose": 100.0, "design_id": f"FAQBD-2026-{uuid.uuid4().hex[:6].upper()}",
+        "sdf_data": "", "pdbqt_data": ""
+    }
+
+if "mode" not in st.session_state:
+    st.session_state.mode = "Student Mode (Simplified)"
+
+if "protein_data" not in st.session_state:
+    st.session_state.protein_data = None
+
+# --- HELPER FUNCTIONS ---
 def fetch_pubchem_3d(cid):
     try:
         url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/SDF?record_type=3d"
@@ -35,7 +63,7 @@ def generate_ligand_pdbqt(sdf_text, compound_name):
     lines.append("TORSDOF 0")
     return "\n".join(lines)
 
-def fetch_pubchem_data(drug_name, active_drug_state):
+def fetch_pubchem_data(drug_name):
     raw_query = str(drug_name).strip()
     if not raw_query: 
         return {"success": False, "error_msg": "Please enter a valid compound name."}
@@ -71,8 +99,8 @@ def fetch_pubchem_data(drug_name, active_drug_state):
                 "cid": cid, "formula": props.get('MolecularFormula', 'N/A'),
                 "smiles": props.get('CanonicalSMILES', 'N/A'), "mw": mw, "logp": logp,
                 "h_donors": int(props.get('HBondDonorCount', 0)), "h_acceptors": int(props.get('HBondAcceptorCount', 0)), 
-                "bcs": bcs, "dose": active_drug_state.get('dose', 100.0),
-                "design_id": active_drug_state.get('design_id', "FAQBD-2026-MAIN"),
+                "bcs": bcs, "dose": st.session_state.active_drug.get('dose', 100.0),
+                "design_id": st.session_state.active_drug.get('design_id', f"FAQBD-2026-{uuid.uuid4().hex[:6].upper()}"),
                 "sdf_data": sdf_3d, "pdbqt_data": pdbqt_lig
             }
         return {"success": False, "error_msg": f"Compound '{raw_query}' not found."}
@@ -94,29 +122,8 @@ def render_3d_molecule(sdf_data):
         viewer.render();
     </script>
     """
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import uuid
-import streamlit.components.v1 as components
-from utils import fetch_pubchem_data, render_3d_molecule
 
-st.set_page_config(page_title="FormuAI-QbD Suite", layout="wide", initial_sidebar_state="expanded")
-
-# Initialize State
-if "active_drug" not in st.session_state:
-    st.session_state.active_drug = {
-        "name": "Artemisinin", "cid": 68827, "formula": "C15H22O5",
-        "smiles": "CC1CCC2C(C(=O)CC3C2(O1)OO3)C", "mw": 282.33, "logp": 2.9,
-        "h_donors": 0, "h_acceptors": 5, "bcs": "Class II (Low Solubility, High Permeability)", 
-        "dose": 100.0, "design_id": f"FAQBD-2026-{uuid.uuid4().hex[:6].upper()}",
-        "sdf_data": "", "pdbqt_data": ""
-    }
-
-if "mode" not in st.session_state:
-    st.session_state.mode = "Student Mode (Simplified)"
-
-# Sidebar Layout
+# --- SIDEBAR UI ---
 st.sidebar.title("🧪 Navigation Menu")
 st.sidebar.caption("User Perspective Mode")
 st.session_state.mode = st.sidebar.radio(
@@ -144,7 +151,7 @@ st.sidebar.markdown("---")
 st.sidebar.caption(f"Traceable Design ID: {st.session_state.active_drug['design_id']}")
 st.sidebar.caption(f"Active Compound: {st.session_state.active_drug['name']}")
 
-# MODULE 1: PubChem 3D Intelligence
+# --- MODULE ROUTING ---
 if tabs == "1. PubChem API & Autocorrect Intelligence":
     st.title("🧪 PubChem Chemical Intelligence Engine")
     
@@ -153,7 +160,7 @@ if tabs == "1. PubChem API & Autocorrect Intelligence":
     fetch_btn = c2.button("Fetch Compound Profile", use_container_width=True)
     
     if fetch_btn:
-        res = fetch_pubchem_data(query, st.session_state.active_drug)
+        res = fetch_pubchem_data(query)
         if res["success"]:
             st.session_state.active_drug.update(res)
             st.success(f"Loaded {res['name']}")
@@ -161,7 +168,7 @@ if tabs == "1. PubChem API & Autocorrect Intelligence":
             st.error(res["error_msg"])
 
     if not st.session_state.active_drug.get("sdf_data"):
-        init_res = fetch_pubchem_data(st.session_state.active_drug['name'], st.session_state.active_drug)
+        init_res = fetch_pubchem_data(st.session_state.active_drug['name'])
         if init_res["success"]:
             st.session_state.active_drug.update(init_res)
 
@@ -244,7 +251,14 @@ elif tabs == "10. Interactive QbD Risk Priority Matrix":
 
 elif tabs == "11. Digital Audit & PDF Export":
     st.header("11. Digital Audit & PDF Export")
-    st.button("Export PDF", use_container_width=True)
+    def get_pdf():
+        b = BytesIO()
+        doc = SimpleDocTemplate(b, pagesize=letter)
+        styles = getSampleStyleSheet()
+        doc.build([Paragraph(f"Audit Report: {st.session_state.active_drug['name']}", styles['Heading1'])])
+        b.seek(0)
+        return b
+    st.download_button("📥 Download Audit PDF", get_pdf(), "Audit.pdf", "application/pdf", use_container_width=True)
 
 elif tabs == "12. System Documentation & Architecture":
     st.header("12. System Documentation & Architecture")
