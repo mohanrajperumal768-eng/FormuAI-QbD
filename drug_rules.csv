@@ -1,0 +1,16 @@
+﻿Drug_Name,Half_Life_hrs,BCS_Class,Swallowing_Difficulty,Preferred_Onset,Recommended_Tablet,Excipient_Strategy,Critical_Quality_Attribute,Key_Risk
+Metformin,6,Class I,No,Prolonged,Extended-Release Matrix,"HPMC K100M (20-40%), MCC PH102",Drug Release at 12h,Burst release
+Paracetamol,2.5,Class III,Yes,Immediate,Orally Disintegrating (ODT),"Mannitol, Crospovidone (5%)",Disintegration Time (<30s),High friability
+Amlodipine,30,Class I,No,Normal,Immediate-Release,"Microcrystalline Cellulose, Starch",Assay & Dissolution (>85% at 30 min),Moisture degradation
+Omeprazole,1,Class II,No,Delayed,Enteric-Coated Tablet,"Eudragit L100-55 coating, Lactose",Acid Resistance (0.1N HCl),Gastric degradation
+Ondansetron,3.9,Class II,Yes,Immediate,Orally Disintegrating (ODT),"Pearlitol Flash, Sodium Starch Glycolate",Disintegration Time (<30s),Content uniformity
+Diltiazem,3.5,Class I,No,Prolonged,Extended-Release Matrix,"Ethylcellulose, HPMC K15M",Release Kinetics (Zero-order),Incomplete release
+Salbutamol,4,Class I,Yes,Immediate,Buccal Mucoadhesive,"Carbopol 934P, HPMC K4M",Mucoadhesive Strength,Premature swallowing
+Ibuprofen,2,Class II,No,Normal,Immediate-Release,"Croscarmellose Sodium, PVP K30",Dissolution Rate,Poor solubility
+Nitroglycerin,0.05,Class I,Yes,Immediate,Sublingual Tablet,"Lactose, Compressible Sugar",Disintegration & Permeation,Volatilization
+Ranitidine,2.5,Class I,No,Prolonged,Floating Gastroretentive,"HPMC K100M, Sodium Bicarbonate",Floating Lag Time & Total Floating Time,Premature gastric emptying
+Ciprofloxacin,4,Class IV,No,Normal,Immediate-Release,"Sodium Starch Glycolate, Microcrystalline Cellulose",Dissolution Rate (>80% at 30 min),Low solubility & permeability
+Atorvastatin,14,Class II,No,Normal,Immediate-Release,"Calcium Carbonate, Lactose Monohydrate",Dissolution Rate,Oxidation sensitivity
+Metoprolol,3.5,Class I,No,Prolonged,Extended-Release Matrix,"Hydroxypropyl Cellulose, Eudragit NE",24-hour Release Profile,Dose dumping
+Pantoprazole,1,Class III,No,Delayed,Enteric-Coated Tablet,"Methacrylic Acid Copolymer, Titanium Dioxide",Acid Resistance (2h in acid),Moisture & acid instability
+Losartan,2,Class III,No,Normal,Immediate-Release,"Microcrystalline Cellulose, Lactose",Disintegration & Dissolution,High first-pass metabolism
