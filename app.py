@@ -166,7 +166,6 @@ elif tabs == "2. Advanced Dosage Form Ranker":
         site_target = st.selectbox("Primary Absorption Site", ["Upper Small Intestine", "Systemic Direct", "Colon", "Stomach"])
 
     if st.button("Evaluate Dosage Suitability Matrix"):
-        # Dynamic Ranking Engine
         scores = []
         if target_onset == "Prolonged / Extended Release (12-24h Matrix)":
             scores.append({"Dosage Form": "Sustained-Release HPMC Matrix Tablet", "Score": 92, "Rationale": "Optimal for short half-life drug to maintain therapeutic levels."})
@@ -228,13 +227,11 @@ elif tabs == "4. 3D Response Surface Optimization":
         comp_force = st.slider("Compression Force (kN)", 5, 25, 12)
         granulation_method = st.selectbox("Manufacturing Process", ["Direct Compression", "Wet Granulation", "Dry Granulation (Roller Compaction)"])
 
-    # Synthetic ML Engine
     np.random.seed(42)
     X_train = np.random.uniform(low=[5, 1], high=[40, 10], size=(100, 2))
     y_release = 100 - (X_train[:, 0] * 1.3) - (X_train[:, 1] * 0.8) + np.random.normal(0, 2, 100)
     model = RandomForestRegressor(n_estimators=100, random_state=42).fit(X_train, y_release)
 
-    # 3D Meshgrid Data
     pol_range = np.linspace(5, 40, 25)
     bind_range = np.linspace(1, 10, 25)
     P_grid, B_grid = np.meshgrid(pol_range, bind_range)
@@ -302,7 +299,6 @@ elif tabs == "6. Comprehensive QbD & Audit PDF Generator":
     risk_df["Risk Level"] = risk_df["RPN"].apply(lambda x: "High Risk" if x >= 150 else ("Medium Risk" if x >= 80 else "Low Risk"))
     st.dataframe(risk_df.sort_values(by="RPN", ascending=False), use_container_width=True)
 
-    # Professional PDF Generator
     def generate_pdf_report():
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -356,4 +352,5 @@ elif tabs == "7. User Documentation & Platform Manual":
     *4. 3D Response Surface Methodology (RSM)*
     * Predicts release behavior using a machine learning model, generating dynamic 3D surface graphs across variable polymer and binder ratios.
 
-    **5. Release Kinetics Engin
+    *5. Release Kinetics Engine*
+    * Fits empirical dissolution data to Zero-Order, First-Order, Higuchi, and Korsmeyer-Peppas kinetics, extra
