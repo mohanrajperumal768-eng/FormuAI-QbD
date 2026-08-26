@@ -1,7 +1,33 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
 import requests, uuid, urllib.parse
 import streamlit.components.v1 as components
+from io import BytesIO
+
+# --- OPTIONAL DEPENDENCIES ---
+try:
+    from rdkit import Chem
+    from rdkit.Chem import Draw
+    RDKIT_AVAILABLE = True
+except ImportError:
+    RDKIT_AVAILABLE = False
+
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
+st.set_page_config(
+    page_title="FormuAI-QbD Engine: Drug Discovery & Formulation",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # ==========================================
 # 1. BULLETPROOF PUBCHEM 3D FETCH ENGINE
@@ -36,7 +62,6 @@ def fetch_pubchem_robust(drug_name):
             
             bcs = "BCS Class II (Low Sol, High Perm)" if logp > 2.0 else "BCS Class I (High Sol, High Perm)"
             
-            # Step 2: Fetch Genuine 3D PDB Structure from PubChem
             pdb_3d_data = ""
             sdf_3d_data = ""
             
@@ -73,10 +98,7 @@ def fetch_pubchem_robust(drug_name):
 
 
 def build_autodock_pdbqt_from_pdb(pdb_text, molecule_name="Ligand"):
-    """
-    Converts valid 3D PDB text into a 100% compliant AutoDock PDBQT file 
-    with proper column alignment that AutoDockTools reads seamlessly.
-    """
+    """Converts 3D PDB into a compliant AutoDock PDBQT file."""
     if not pdb_text or "ATOM" not in pdb_text:
         return ""
     
@@ -124,10 +146,76 @@ def build_autodock_pdbqt_from_pdb(pdb_text, molecule_name="Ligand"):
     return "\n".join(pdbqt_lines)
 
 
+def render_3d_molecule(sdf_data):
+    """3Dmol.js Viewer Engine."""
+    if not sdf_data or len(sdf_data) < 50:
+        return "<div style='color: white; text-align: center; padding-top: 100px; font-family: sans-serif;'>No 3D Conformer Data Available</div>"
+    
+    escaped_sdf = sdf_data.replace("\\", "\\\\").replace("`", "'").replace("\n", "\\n").replace("\r", "")
+    
+    return f"""
+    <div id="container-3d" style="width: 100%; height: 380px; background-color: #0e1117; border-radius: 10px; border: 1px solid #30363d;"></div>
+    <script src="https://3dmol.org/build/3Dmol-min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {{
+            let viewer = $3Dmol.createViewer("container-3d", {{backgroundColor: "#0e1117"}});
+            viewer.addModel({escaped_sdf}, "sdf");
+            viewer.setStyle({{}}, {{stick: {{colorscheme: "stickCoolWarm", radius: 0.25}}, sphere: {{scale: 0.25}}}});
+            viewer.zoomTo();
+            viewer.render();
+        }});
+    </script>
+    """
+
 # ==========================================
-# MODULE 1 STREAMLIT UI
+# INITIAL STATE & SIDEBAR ROUTING
 # ==========================================
 
+if "active_drug" not in st.session_state:
+    init_res = fetch_pubchem_robust("Acetaminophen")
+    if init_res["success"]:
+        st.session_state.active_drug = init_res
+    else:
+        st.session_state.active_drug = {
+            "name": "Acetaminophen", "iupac": "N-(4-hydroxyphenyl)acetamide", "cid": 1983, "formula": "C8H9NO2",
+            "smiles": "CC(=O)NC1=CC=C(C=C1)O", "mw": 151.16, "logp": 0.46,
+            "h_donors": 2, "h_acceptors": 2, "bcs": "BCS Class I (High Sol, High Perm)", 
+            "dose": 500.0, "design_id": f"FAQBD-2026-{uuid.uuid4().hex[:6].upper()}",
+            "sdf_data": "", "pdb_data": "", "pdbqt_data": ""
+        }
+
+if "selected_receptor" not in st.session_state:
+    st.session_state.selected_receptor = {
+        "pdb_id": "6COX",
+        "name": "Cyclooxygenase-2 (COX-2)",
+        "center": [24.52, 21.18, 15.80],
+        "size": [20.0, 20.0, 20.0],
+        "residues": ["TYR-355", "SER-530", "VAL-523", "ARG-120", "ALA-527"]
+    }
+
+st.sidebar.title("🧪 FormuAI-QbD Engine")
+st.sidebar.caption("End-to-End Molecular Docking to Master Formulation")
+
+tabs = st.sidebar.radio("Pipeline Workflow", [
+    "1. Compound Intelligence & Structure Viewer",
+    "2. Ligand Prep & PDBQT Generator",
+    "3. Target Prediction & Bioactivity Score",
+    "4. Macromolecular Receptor & Active Site",
+    "5. Molecular Docking & Interaction Analysis",
+    "6. ADMET & Pharmacokinetic Risk Profiler",
+    "7. Evidence-Based Dosage Form Ranker",
+    "8. Excipient Compatibility & Master Formulation",
+    "9. 3D RSM Optimization & Release Kinetics",
+    "10. QbD Risk Matrix & Digital Audit Export"
+])
+
+st.sidebar.markdown("---")
+st.sidebar.caption(f"Traceable Design ID: *{st.session_state.active_drug['design_id']}*")
+st.sidebar.caption(f"Active Drug: *{st.session_state.active_drug['name']}*")
+
+# ==========================================
+# MODULE 1: COMPOUND INTELLIGENCE
+# ==========================================
 if tabs == "1. Compound Intelligence & Structure Viewer":
     st.title("🧪 1. Compound Intelligence & Structure Viewer")
     st.markdown("Search any drug molecule to automatically retrieve certified 3D chemical structures.")
@@ -198,9 +286,8 @@ if tabs == "1. Compound Intelligence & Structure Viewer":
     )
 
 # ==========================================
-# MODULE 2 STREAMLIT UI
+# MODULE 2: LIGAND PREPARATION
 # ==========================================
-
 elif tabs == "2. Ligand Prep & PDBQT Generator":
     st.title("⚙️ 2. Advanced Ligand Preparation & File Converter")
     st.markdown("Convert raw structural coordinates into standard AutoDock PDBQT format.")
@@ -270,7 +357,7 @@ elif tabs == "3. Target Prediction & Bioactivity Score":
     st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================
-# MODULE 4: RECEPTOR SETUP & ACTIVE SITE
+# MODULE 4: RECEPTOR SETUP
 # ==========================================
 elif tabs == "4. Macromolecular Receptor & Active Site":
     st.title("🧬 4. Macromolecular Receptor & Active Site Setup")
@@ -336,15 +423,12 @@ elif tabs == "4. Macromolecular Receptor & Active Site":
             "residues": residues
         }
         st.success(f"Receptor *{pdb_code}* grid parameter registered for docking!")
-        st.write("*Identified Pocket Residues:*", ", ".join([f"{r}" for r in residues]))
 
 # ==========================================
-# MODULE 5: DOCKING SIMULATION & ANALYSIS
+# MODULE 5: DOCKING SIMULATION
 # ==========================================
 elif tabs == "5. Molecular Docking & Interaction Analysis":
     st.title("⚡ 5. Universal Molecular Docking Simulation")
-    st.markdown("Computes binding affinity, binding free energy ($\Delta G$), and non-covalent bond profiles.")
-    
     rec = st.session_state.selected_receptor
     drug = st.session_state.active_drug
     
@@ -353,14 +437,11 @@ elif tabs == "5. Molecular Docking & Interaction Analysis":
     if st.button("Run AutoDock Vina Docking Calculation", use_container_width=True):
         with st.spinner("Processing docking poses and evaluating binding energy..."):
             st.balloons()
-            
-            # Dynamic calculation based on drug lipophilicity and MW
             affinity_base = -6.0 - (drug['logp'] * 0.4) - (drug['mw'] / 300.0)
             top_affinity = round(max(-11.5, min(-4.5, affinity_base)), 2)
             
             st.metric("Top Binding Free Energy (ΔG)", f"{top_affinity} kcal/mol", "High Binding Affinity" if top_affinity < -6.0 else "Moderate Affinity")
             
-            st.subheader("Docking Conformer Poses")
             poses_df = pd.DataFrame({
                 "Mode": [1, 2, 3, 4],
                 "Affinity ΔG (kcal/mol)": [top_affinity, round(top_affinity + 0.4, 2), round(top_affinity + 0.9, 2), round(top_affinity + 1.3, 2)],
@@ -369,62 +450,26 @@ elif tabs == "5. Molecular Docking & Interaction Analysis":
             })
             st.table(poses_df)
             
-            st.subheader("Interaction Analysis & Bond Profile")
-            
             interaction_data = [
                 {"Residue": rec['residues'][0] if len(rec['residues'])>0 else "TYR-355", "Bond Type": "Hydrogen Bond", "Nature": "Reversible (Non-covalent)", "Distance (Å)": 2.65, "Energy Contribution": "-2.4 kcal/mol"},
                 {"Residue": rec['residues'][1] if len(rec['residues'])>1 else "SER-530", "Bond Type": "Hydrogen Bond", "Nature": "Reversible (Non-covalent)", "Distance (Å)": 2.82, "Energy Contribution": "-1.8 kcal/mol"},
                 {"Residue": rec['residues'][2] if len(rec['residues'])>2 else "VAL-523", "Bond Type": "Hydrophobic Pi-Sigma", "Nature": "Reversible (Van der Waals)", "Distance (Å)": 3.65, "Energy Contribution": "-1.3 kcal/mol"}
             ]
-            
-            df_inter = pd.DataFrame(interaction_data)
-            st.dataframe(df_inter, use_container_width=True)
-            
-            col_x, col_y = st.columns(2)
-            with col_x:
-                st.subheader("Docked Complex View")
-                components.html(render_3d_molecule(drug.get("sdf_data", "")), height=300)
-            with col_y:
-                st.subheader("Energy Breakdown Chart")
-                fig_p = px.pie(df_inter, values=[2.4, 1.8, 1.3], names="Bond Type", title="Interaction Energy Breakdown")
-                st.plotly_chart(fig_p, use_container_width=True)
-                
-            st.subheader("📥 Export Complete Docking Log")
-            dock_txt = f"""FORMUAI DOCKING REPORT
-Drug Molecule: {drug['name']}
-Receptor ID: {rec['pdb_id']}
-Grid Center: {rec['center']}
-Top Affinity: {top_affinity} kcal/mol
-
-Detailed Interactions:
-- {interaction_data[0]['Residue']}: {interaction_data[0]['Bond Type']} ({interaction_data[0]['Distance (Å)']} A)
-- {interaction_data[1]['Residue']}: {interaction_data[1]['Bond Type']} ({interaction_data[1]['Distance (Å)']} A)
-"""
-            st.download_button(
-                "📥 Download Docking Results (.TXT Log)",
-                data=dock_txt,
-                file_name=f"Docking_Results_{drug['name']}_{rec['pdb_id']}.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
+            st.dataframe(pd.DataFrame(interaction_data), use_container_width=True)
 
 # ==========================================
 # MODULE 6: ADMET PROFILER
 # ==========================================
 elif tabs == "6. ADMET & Pharmacokinetic Risk Profiler":
     st.title("🛡️ 6. Universal ADMET Profiler")
-    st.markdown("Evaluates pharmacokinetic parameters based on drug descriptors.")
-    
     d = st.session_state.active_drug
     
-    st.subheader("Lipinski Rule Compliance")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Molecular Weight", f"{d['mw']} g/mol", "PASS" if d['mw'] <= 500 else "FAIL")
     c2.metric("LogP", f"{d['logp']}", "PASS" if d['logp'] <= 5.0 else "FAIL")
     c3.metric("H-Donors", f"{d['h_donors']}", "PASS" if d['h_donors'] <= 5 else "FAIL")
     c4.metric("H-Acceptors", f"{d['h_acceptors']}", "PASS" if d['h_acceptors'] <= 10 else "FAIL")
     
-    st.subheader("Predictive ADMET Spectrum")
     admet_tab = pd.DataFrame({
         "Property": ["Intestinal Absorption", "BBB Permeability", "CYP2D6 Inhibition", "Ames Toxicity Risk", "hERG Toxicity Risk"],
         "Prediction": ["High (>85%)" if d['logp'] > 0 else "Moderate", "Permeable" if d['logp'] > 1.5 else "Non-Permeable", "Non-Inhibitor", "Low Mutagenic Risk", "Low Cardiac Risk"],
@@ -442,14 +487,14 @@ elif tabs == "7. Evidence-Based Dosage Form Ranker":
     
     if "Class II" in d['bcs']:
         recs = [
-            {"Rank": 1, "Formulation Platform": "Self-Emulsifying Drug Delivery System (SEDDS)", "Score": "95.5%", "Rationale": "Improves drug solubilization & absorption"},
+            {"Rank": 1, "Formulation Platform": "Self-Emulsifying Drug Delivery System (SEDDS)", "Score": "95.5%", "Rationale": "Improves drug solubilization"},
             {"Rank": 2, "Formulation Platform": "Nanoemulsion Oral Capsule", "Score": "90.1%", "Rationale": "Enhances systemic dissolution rates"},
             {"Rank": 3, "Formulation Platform": "Amorphous Solid Dispersion Tablet", "Score": "86.4%", "Rationale": "Prevents drug recrystallization"}
         ]
     else:
         recs = [
             {"Rank": 1, "Formulation Platform": "Immediate Release Compressed Tablet", "Score": "98.2%", "Rationale": "Optimal for high solubility APIs"},
-            {"Rank": 2, "Formulation Platform": "Sustained Release Matrix Tablet", "Score": "92.4%", "Rationale": "Extends blood plasma level profile"},
+            {"Rank": 2, "Formulation Platform": "Sustained Release Matrix Tablet", "Score": "92.4%", "Rationale": "Extends plasma level profile"},
             {"Rank": 3, "Formulation Platform": "Oral Fast Dissolving Strip", "Score": "88.1%", "Rationale": "Enables rapid transmucosal entry"}
         ]
     st.dataframe(pd.DataFrame(recs), use_container_width=True)
@@ -459,8 +504,6 @@ elif tabs == "7. Evidence-Based Dosage Form Ranker":
 # ==========================================
 elif tabs == "8. Excipient Compatibility & Master Formulation":
     st.title("⚖️ 8. Universal Master Batch Formulation Engine")
-    st.markdown("Generates custom unit & batch formulations for *any API* based on manual inputs or auto-calculated values.")
-    
     d = st.session_state.active_drug
     
     col1, col2 = st.columns(2)
@@ -471,8 +514,6 @@ elif tabs == "8. Excipient Compatibility & Master Formulation":
         target_weight = st.number_input("Target Total Tablet Weight (mg):", value=float(unit_dose * 1.6))
         binder_ratio = st.slider("Binder Concentration (%)", 10.0, 40.0, 25.0)
 
-    st.subheader(f"Master Formulation Table for {d['name']}")
-    
     ex_weight = target_weight - unit_dose
     binder_mg = ex_weight * (binder_ratio / 100.0)
     disint_mg = ex_weight * 0.10
@@ -485,7 +526,6 @@ elif tabs == "8. Excipient Compatibility & Master Formulation":
         "Per Unit (mg)": [unit_dose, round(filler_mg, 2), round(binder_mg, 2), round(disint_mg, 2), round(lubricant_mg, 2)],
         "Total Batch Required (kg)": [round((unit_dose * batch_size)/1e6, 3), round((filler_mg * batch_size)/1e6, 3), round((binder_mg * batch_size)/1e6, 3), round((disint_mg * batch_size)/1e6, 3), round((lubricant_mg * batch_size)/1e6, 3)]
     })
-    
     st.table(master_formula)
 
 # ==========================================
@@ -493,7 +533,6 @@ elif tabs == "8. Excipient Compatibility & Master Formulation":
 # ==========================================
 elif tabs == "9. 3D RSM Optimization & Release Kinetics":
     st.title("📊 9. 3D RSM Optimization & Kinetics Engine")
-    st.markdown("Model drug dissolution and optimize process variables for *any compound*.")
     
     c1, c2 = st.columns(2)
     with c1:
@@ -503,7 +542,6 @@ elif tabs == "9. 3D RSM Optimization & Release Kinetics":
         rel_8h = round(100 - (poly_conc * 2.1) + (press_force * 0.3), 2)
         st.metric("Predicted 8-Hour Drug Release (%)", f"{rel_8h}%")
 
-    st.subheader("3D Response Surface Contour Map")
     x = np.linspace(5, 35, 20)
     y = np.linspace(4, 24, 20)
     X, Y = np.meshgrid(x, y)
@@ -519,12 +557,6 @@ elif tabs == "9. 3D RSM Optimization & Release Kinetics":
 elif tabs == "10. QbD Risk Matrix & Digital Audit Export":
     st.title("📋 10. QbD Matrix & Digital Audit Engine")
     
-    st.markdown("""
-    * *CQAs (Critical Quality Attributes):* Target quality properties of the drug product (Dissolution Rate, Content Uniformity, Hardness).
-    * *CPPs (Critical Process Parameters):* Key process parameters (Compression Force, Blending Time, Drying Temperature).
-    """)
-    
-    st.subheader("Risk Priority Number (RPN) Matrix")
     qbd_table = pd.DataFrame({
         "CPP Parameter": ["Compression Force", "Mixing Time", "Drying Temp"],
         "Impacted CQA": ["Hardness & Dissolution", "Content Uniformity", "Residual Moisture"],
@@ -534,9 +566,6 @@ elif tabs == "10. QbD Risk Matrix & Digital Audit Export":
         "RPN Score (S x O x D)": [72, 72, 36]
     })
     st.table(qbd_table)
-    
-    st.markdown("---")
-    st.subheader("🖨️ Complete Regulatory Audit Report")
     
     def generate_pdf():
         b = BytesIO()
