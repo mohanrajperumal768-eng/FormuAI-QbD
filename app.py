@@ -353,4 +353,8 @@ elif tabs == "7. User Documentation & Platform Manual":
     * Predicts release behavior using a machine learning model, generating dynamic 3D surface graphs across variable polymer and binder ratios.
 
     *5. Release Kinetics Engine*
-    * Fits empirical dissolution data to Zero-Order, First-Order, Higuchi, and Korsmeyer-Peppas kinetics, extra
+    * Fits empirical dissolution data to Zero-Order, First-Order, Higuchi, and Korsmeyer-Peppas kinetics, extracting diffusion exponents (n).
+
+    *6. Executive QbD & Audit PDF Generator*
+    * Aggregates all session data into an executive Quality-by-Design risk priority matrix and exports audit PDF documentation.
+    """)
