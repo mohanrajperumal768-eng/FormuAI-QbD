@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import uuid
+import urllib.parse
 import streamlit.components.v1 as components
 from datetime import datetime
 from io import BytesIO
@@ -162,9 +163,11 @@ def preprocess_protein_pdb(raw_pdb_text, remove_water=True):
     processed_pdbqt = "\n".join(pdbqt_lines)
     return processed_pdb, processed_pdbqt, np.array(coords)
 
+# Fixed PubChem Fetcher with URL Encoding
 @st.cache_data(ttl=3600)
 def fetch_pubchem_data(drug_name):
-    clean_name = drug_name.strip()
+    raw_query = drug_name.strip()
+    clean_name = urllib.parse.quote(raw_query)
     if not clean_name:
         return {"success": False, "error": "Empty Query"}
     
@@ -175,7 +178,9 @@ def fetch_pubchem_data(drug_name):
             sug_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/{clean_name}/json?limit=1"
             sug_res = requests.get(sug_url, timeout=4)
             if sug_res.status_code == 200 and sug_res.json().get('dictionary_terms'):
-                clean_name = sug_res.json()['dictionary_terms'][0]
+                matched_term = sug_res.json()['dictionary_terms'][0]
+                clean_name = urllib.parse.quote(matched_term)
+                raw_query = matched_term
                 url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_name}/property/CID,MolecularFormula,MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount,CanonicalSMILES/JSON"
                 res = requests.get(url, timeout=6)
         
@@ -186,7 +191,7 @@ def fetch_pubchem_data(drug_name):
             bcs = "Class II" if logp > 2.5 and mw > 350 else ("Class I" if logp <= 2.5 and mw <= 350 else "Class III")
             return {
                 "success": True,
-                "name": clean_name,
+                "name": raw_query.capitalize(),
                 "cid": props.get('CID', 0),
                 "formula": props.get('MolecularFormula', 'N/A'),
                 "smiles": props.get('CanonicalSMILES', 'N/A'),
@@ -392,7 +397,8 @@ elif tabs == "6. Release Kinetics & Model Comparison":
     fig_kin.add_trace(go.Scatter(x=t_pts, y=r_pts, mode='lines+markers', name='Observed'))
     st.plotly_chart(fig_kin, use_container_width=True)
 
-# MODULE 7: INTERACTIVE QBD RISK PRIORITY MATRIXelif tabs == "7. Interactive QbD Risk Priority Matrix":
+# MODULE 7: INTERACTIVE QBD RISK PRIORITY MATRIX
+elif tabs == "7. Interactive QbD Risk Priority Matrix":
     st.header("7. Quality-by-Design (QbD) Risk Priority Assessment")
     default_risks = [
         {"CPP": "Polymer Concentration", "CQA": "12h Dissolution Rate", "Severity": 9, "Occurrence": 6, "Detectability": 4},
