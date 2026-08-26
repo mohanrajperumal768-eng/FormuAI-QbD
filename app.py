@@ -4,13 +4,8 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
-from io import BytesIO
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
 
 st.set_page_config(page_title="FormuAI-QbD (Universal API Engine)", layout="wide")
 
@@ -34,7 +29,7 @@ def fetch_universal_pubchem_data(drug_name):
             h_acceptors = int(props.get('HBondAcceptorCount', 4))
             rot_bonds = int(props.get('RotatableBondCount', 3))
             
-            # Universal Rule-based Estimation
+            # Universal Rule-based BCS Estimation
             if logp > 2.5 and mw > 350:
                 bcs = "Class II (Low Solubility, High Permeability)"
             elif logp <= 2.5 and mw <= 350:
@@ -65,19 +60,16 @@ tabs = st.sidebar.radio("Navigation Menu", [
     "2. Dosage Form Ranker",
     "3. Multi-Design Formulation Optimizer (3D RSM)",
     "4. Release Kinetics Engine",
-    "5. Quantitative QbD Risk & PDF Audit Generator"
+    "5. Quantitative QbD Risk & Executive Report"
 ])
 
 # TAB 1: UNIVERSAL DRUG INTELLIGENCE
 if tabs == "1. Universal Drug Intelligence (PubChem Live)":
     st.header("1. API Property & Formulation Significance Analysis")
-    st.write("Type *any active pharmaceutical ingredient (API)* or botanical compound to query PubChem in real-time.")
+    st.write("Type *any active pharmaceutical ingredient (API)* or compound name to query NIH PubChem in real-time.")
 
-    col_search1, col_search2 = st.columns([3, 1])
-    with col_search1:
-        query_drug = st.text_input("Enter Any API Name (e.g., Curcumin, Paclitaxel, Metformin, Ciprofloxacin, Ciprofloxacin HCl):", "Curcumin")
+    query_drug = st.text_input("Enter Any API Name (e.g., Metformin, Curcumin, Paclitaxel, Ciprofloxacin, Ibuprofen):", "Curcumin")
     
-    # Defaults / State
     api_result = fetch_universal_pubchem_data(query_drug)
     
     if api_result["success"]:
@@ -88,7 +80,7 @@ if tabs == "1. Universal Drug Intelligence (PubChem Live)":
         h_donors = api_result["HBondDonorCount"]
         h_acceptors = api_result["HBondAcceptorCount"]
     else:
-        st.error(f"⚠️ Could not fetch data automatically ({api_result.get('error')}). Using manual parameters below.")
+        st.error(f"⚠️ Could not fetch data automatically ({api_result.get('error')}). Enter manual parameters below.")
         mw = st.number_input("Molecular Weight (g/mol)", value=300.0)
         logp = st.number_input("LogP", value=2.0)
         bcs = st.selectbox("BCS Classification", ["Class I", "Class II", "Class III", "Class IV"])
@@ -118,9 +110,9 @@ if tabs == "1. Universal Drug Intelligence (PubChem Live)":
         if "Class II" in bcs or "Class IV" in bcs or logp > 3.0:
             st.warning("⚠️ *Low Aqueous Solubility Risk:* Dissolution-rate limited absorption. Consider micronization, solid dispersion, or lipid-based nanocarriers.")
         if dose >= 500:
-            st.error("🚨 *High Dose Load (≥500mg):* Limited suitability for Orally Disintegrating Tablets (ODTs) due to high tablet mass.")
+            st.error("🚨 *High Dose Load (≥500mg):* Limited suitability for Orally Disintegrating Tablets (ODTs) due to high tablet mass constraints.")
         if mw > 500:
-            st.warning("⚖️ *High Molecular Weight (>500 g/mol):* May exhibit reduced passive intestinal membrane permeability (Lipinski Rule Violation).")
+            st.warning("⚖️ *High Molecular Weight (>500 g/mol):* May exhibit reduced passive intestinal membrane permeability.")
 
 # TAB 2: DOSAGE FORM RANKER
 elif tabs == "2. Dosage Form Ranker":
@@ -158,7 +150,6 @@ elif tabs == "3. Multi-Design Formulation Optimizer (3D RSM)":
         tablet_wt = st.number_input("Target Weight (mg)", value=400.0)
         comp_force = st.slider("Compression Force (kN)", 5, 25, 12)
 
-    # Synthetic ML Engine
     np.random.seed(42)
     X_train = np.random.uniform(low=[5, 1, 100], high=[40, 10, 500], size=(200, 3))
     y_release = 100 - (X_train[:, 0] * 1.4) - (X_train[:, 1] * 0.6) + np.random.normal(0, 2, 200)
@@ -226,9 +217,9 @@ elif tabs == "4. Release Kinetics Engine":
     except Exception as e:
         st.error(f"Error parsing kinetics data: {e}")
 
-# TAB 5: QUANTITATIVE QBD & PDF GENERATOR
-elif tabs == "5. Quantitative QbD Risk & PDF Audit Generator":
-    st.header("5. Quantitative QbD Risk Priority Matrix & Official PDF Audit")
+# TAB 5: QUANTITATIVE QBD & REPORT GENERATOR
+elif tabs == "5. Quantitative QbD Risk & Executive Report":
+    st.header("5. Quantitative QbD Risk Priority Matrix & Audit Export")
     risk_data = pd.DataFrame({
         "Parameter": ["Polymer Concentration", "Compression Force", "Blending Time", "Particle Size"],
         "CQA": ["12h Drug Release", "Tablet Hardness", "Content Uniformity", "Dissolution Rate"],
@@ -242,30 +233,5 @@ elif tabs == "5. Quantitative QbD Risk & PDF Audit Generator":
     edited_df["Risk Category"] = edited_df["RPN"].apply(lambda r: "High Risk" if r >= 200 else ("Medium Risk" if r >= 100 else "Low Risk"))
     st.dataframe(edited_df.sort_values(by="RPN", ascending=False), use_container_width=True)
 
-    def generate_pdf(df):
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        styles = getSampleStyleSheet()
-        story = []
-
-        story.append(Paragraph("<b>FormuAI-QbD Executive Development Audit</b>", styles['Title']))
-        story.append(Spacer(1, 12))
-        story.append(Paragraph("<b>Quality by Design (QbD) Risk Priority Matrix Results</b>", styles['Heading2']))
-        story.append(Spacer(1, 12))
-
-        table_data = [df.columns.tolist()] + df.values.tolist()
-        t = Table(table_data)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
-        story.append(t)
-        doc.build(story)
-        buffer.seek(0)
-        return buffer
-
-    pdf_bytes = generate_pdf(edited_df)
-    st.download_button("📥 Download Official QbD Development Audit Report (PDF)", pdf_bytes, "FormuAI_QbD_Executive_Report.pdf", "application/pdf")
+    csv_data = edited_df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download QbD Audit Summary (CSV)", csv_data, "FormuAI_QbD_Audit.csv", "text/csv")
