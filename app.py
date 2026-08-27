@@ -192,7 +192,7 @@ st.caption("Tools: MMFF94 & UFF Force Fields, Gasteiger/Gasteiger-Hückel Partia
 m2_col1, m2_col2 = st.columns(2)
 with m2_col1:
     st.write("*Force Field Parameters:* MMFF94s / Universal Force Field (UFF)")
-    st.write(*Total Energy Minimization Iterations:* 500 Steps)
+    st.write("*Total Energy Minimization Iterations:* 500 Steps")
     st.write(f"*Calculated Dipole Moment:* {round(logp * 0.85 + 1.2, 2)} Debye")
 with m2_col2:
     est_energy = round(-124.5 - (mw * 0.42), 2)
@@ -375,7 +375,7 @@ st.markdown("<div class='module-card'>", unsafe_allow_html=True)
 st.markdown("### Module 14: 3D RSM Optimization & Dissolution Kinetics Engine")
 st.caption("Tools: Response Surface Methodology (Central Composite / Box-Behnken), Korsmeyer-Peppas Model")
 
-st.write("*Dissolution Kinetic Fit:* Korsmeyer-Peppas Release Equation ($M_t / M_inf = k · t^n$)")
+st.write("*Dissolution Kinetic Fit:* Korsmeyer-Peppas Release Equation ($M_t / M_{inf} = k \cdot t^n$)")
 st.write("*Calculated Release Exponent (n):* 0.45 (Fickian Diffusion Mechanism)")
 st.write("*Predicted T_80% Dissolution Time:* 6.4 Hours")
 st.markdown("</div>", unsafe_allow_html=True)
@@ -438,30 +438,7 @@ audit_payload = {
     "LogP": logp,
     "BCS": bcs_class,
     "Owner": "Mohan Raj Perumal",
-    "Timestamp": datetime.datetime.now(datetime.timezonepper()
-
-st.code(f"DIGITAL CERTIFICATE SHA-256 HASH:\n{sha256_signature}", language="text")
-st.download_button(
-    "📥 Download Complete Audit Certificate (JSON)",
-    data=json.dumps(audit_payload, indent=4),
-    file_name=f"Regulatory_Audit_{st.session_state.compound_name}.json",
-    mime="application/json"
-)
-st.markdown("</div>", unsafe_allow_html=True)
-
-# --- MASTER OWNERSHIP FOOTER ---
-st.markdown("""
-<div class="footer-container">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-        <div>
-            <strong>FormuAI-QbD Master Engine v4.0</strong> | Department of Pharmaceutical Chemistry & Pharmaceutics
-        </div>
-        <div>
-            <strong>Lead Researcher & Architecture Owner:</strong> Mohan Raj Perumal
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True).utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    "Timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 }
 sha256_signature = hashlib.sha256(json.dumps(audit_payload).encode()).hexdigest().upper()
 
